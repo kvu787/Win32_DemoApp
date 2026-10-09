@@ -517,6 +517,9 @@ void App::Event(const std::wstring &event)
 }
 void App::PopulateReport(HWND list, bool sensors)
 {
+    const bool gallerySensors = sensors && GetParent(list) == panel_;
+    if (gallerySensors)
+        sensorUpdating_ = true;
     ListView_DeleteAllItems(list);
     if (sensors)
     {
@@ -534,6 +537,11 @@ void App::PopulateReport(HWND list, bool sensors)
         Row(list, 0, {L"Button", L"USER32", L"Push / check / radio"}, 0, 0);
         Row(list, 1, {L"Tree view", L"COMCTL32", L"Hierarchy"}, 1, 1);
         Row(list, 2, {L"List view", L"COMCTL32", L"Rows and columns"}, 2, 2);
+    }
+    if (gallerySensors)
+    {
+        sensorUpdating_ = false;
+        SensorRestore(list);
     }
 }
 void App::Build(int page)
@@ -963,27 +971,39 @@ void App::Build(int page)
     case 12:
     {
         Label(L"Demo Sensor Status - native report list with app-managed group expansion", 16, 12);
-        auto list =
-            Add(WC_LISTVIEWW, L"Sensors", WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS, 1201,
-                16, 48, 835, 240, WS_EX_CLIENTEDGE);
+        Add(L"Button", L"&Row (native selection)", WS_TABSTOP | WS_GROUP | BS_AUTORADIOBUTTON, 1210, 16, 48,
+            250, 28);
+        Add(L"Button", L"&Cell (app-managed selection)", WS_TABSTOP | BS_AUTORADIOBUTTON, 1211, 290, 48, 370,
+            28);
+        auto list = Add(WC_LISTVIEWW, L"Sensors",
+                        WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS,
+                        1201, 16, 88, 835, 240, WS_EX_CLIENTEDGE);
+        if (!SetWindowSubclass(list, SensorProc, 1, reinterpret_cast<DWORD_PTR>(this)))
+            throw std::runtime_error("Sensor list subclass failed.");
         ListView_SetExtendedListViewStyle(list, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
         ListView_SetImageList(list, images_, LVSIL_SMALL);
         Columns(list,
                 {{L"Sensor", S(365)}, {L"Current", S(150)}, {L"Minimum", S(150)}, {L"Maximum", S(150)}});
         PopulateReport(list, true);
-        Add(L"Button", L"System Summary / original dummy data", BS_GROUPBOX, 0, 16, 320, 835, 188);
-        Label(L"Processor", 36, 352, 135);
-        Add(L"Edit", L"Example CPU - 8 cores", WS_TABSTOP | ES_READONLY, 1202, 182, 349, 400, 27,
+        Add(L"Static", L"", SS_LEFT, 1212, 16, 345, 835, 50);
+        SensorMode(sensorCellMode_);
+        Label(L"Row uses native LVS_EX_FULLROWSELECT. Cell uses LVM_SUBITEMHITTEST plus application state "
+              L"and NM_CUSTOMDRAW. Click a cell or use arrow keys; Enter/double-click the CPU group toggles "
+              L"its dummy children. Blank space keeps the active cell. Values are read-only.",
+              16, 405, 835, 68);
+        Add(L"Button", L"System Summary / original dummy data", BS_GROUPBOX, 0, 16, 492, 835, 188);
+        Label(L"Processor", 36, 524, 135);
+        Add(L"Edit", L"Example CPU - 8 cores", WS_TABSTOP | ES_READONLY, 1202, 182, 521, 400, 27,
             WS_EX_CLIENTEDGE);
-        Label(L"Memory", 36, 394, 135);
-        Add(L"Edit", L"32 GB (demo)", WS_TABSTOP | ES_READONLY, 1203, 182, 391, 400, 27, WS_EX_CLIENTEDGE);
-        Label(L"Profile", 36, 438, 135);
-        auto combo = Add(L"ComboBox", L"", WS_TABSTOP | CBS_DROPDOWNLIST, 1204, 182, 435, 400, 100);
+        Label(L"Memory", 36, 566, 135);
+        Add(L"Edit", L"32 GB (demo)", WS_TABSTOP | ES_READONLY, 1203, 182, 563, 400, 27, WS_EX_CLIENTEDGE);
+        Label(L"Profile", 36, 610, 135);
+        auto combo = Add(L"ComboBox", L"", WS_TABSTOP | CBS_DROPDOWNLIST, 1204, 182, 607, 400, 100);
         for (auto s : {L"Balanced (demo)", L"Performance (demo)"})
             SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(s));
         SendMessageW(combo, CB_SETCURSEL, 0, 0);
-        Button(L"Floating &Sensor Status", 1205, 16, 548, 390);
-        Button(L"Floating Active &Clock", 1206, 436, 548, 390);
+        Button(L"Floating &Sensor Status", 1205, 16, 720, 390);
+        Button(L"Floating Active &Clock", 1206, 436, 720, 390);
         break;
     }
     case 13:
@@ -1296,6 +1316,13 @@ void App::Command(int id, int code, HWND control)
         FloatingDemo(id);
         return;
     }
+    if ((id == 1210 || id == 1211) && code == BN_CLICKED)
+    {
+        SensorMode(id == 1211);
+        Event(sensorCellMode_ ? L"Cell mode: application-managed active cell and custom draw."
+                              : L"Row mode: native report-list selection.");
+        return;
+    }
     if (id == 403 || id == 404 || id == 405)
     {
         SendDlgItemMessageW(panel_, 402, LVM_SETVIEW,
@@ -1396,18 +1423,37 @@ void App::Notify(NMHDR *hdr)
         };
         ListView_SortItems(hdr->hwndFrom, compare, reinterpret_cast<LPARAM>(this));
     }
-    if (hdr->idFrom == 1201 && (hdr->code == NM_DBLCLK || hdr->code == LVN_KEYDOWN))
+    if (hdr->idFrom == 1201 && GetParent(hdr->hwndFrom) == panel_)
     {
-        if (hdr->code == LVN_KEYDOWN && reinterpret_cast<NMLVKEYDOWN *>(hdr)->wVKey != VK_RETURN)
+        if (sensorUpdating_)
             return;
-        int index = ListView_GetNextItem(hdr->hwndFrom, -1, LVNI_SELECTED);
-        LVITEMW item{};
-        item.mask = LVIF_PARAM;
-        item.iItem = index;
-        if (index >= 0 && ListView_GetItem(hdr->hwndFrom, &item) && item.lParam == 100)
+        if (hdr->code == LVN_ITEMCHANGED)
         {
-            sensorExpanded_ = !sensorExpanded_;
-            PopulateReport(hdr->hwndFrom, true);
+            const auto change = reinterpret_cast<NMLISTVIEW *>(hdr);
+            if (change->iItem >= 0 && (change->uNewState & (LVIS_SELECTED | LVIS_FOCUSED)))
+            {
+                if (sensorCellMode_)
+                    SensorSelect(hdr->hwndFrom, change->iItem, sensorColumn_);
+                else if (change->uNewState & LVIS_SELECTED)
+                    sensorKey_ = SensorKey(hdr->hwndFrom, change->iItem);
+            }
+            SensorLabel(hdr->hwndFrom);
+            return;
+        }
+        if (hdr->code == LVN_KEYDOWN && sensorCellMode_ &&
+            SensorKeyDown(hdr->hwndFrom, reinterpret_cast<NMLVKEYDOWN *>(hdr)->wVKey))
+            return;
+        if (hdr->code == NM_DBLCLK ||
+            (hdr->code == LVN_KEYDOWN && reinterpret_cast<NMLVKEYDOWN *>(hdr)->wVKey == VK_RETURN))
+        {
+            const int row = sensorCellMode_ ? SensorIndex(hdr->hwndFrom, sensorKey_)
+                                            : ListView_GetNextItem(hdr->hwndFrom, -1, LVNI_SELECTED);
+            if (row >= 0)
+            {
+                sensorKey_ = SensorKey(hdr->hwndFrom, row);
+                SensorToggle(hdr->hwndFrom);
+            }
+            return;
         }
     }
     const wchar_t *name = hdr->code == LVN_ITEMCHANGED      ? L"LVN_ITEMCHANGED"
@@ -1805,15 +1851,7 @@ LRESULT App::PanelMessage(HWND h, UINT m, WPARAM w, LPARAM l)
         auto hdr = reinterpret_cast<NMHDR *>(l);
         if (hdr->idFrom == 1201 && hdr->code == NM_CUSTOMDRAW)
         {
-            auto draw = reinterpret_cast<NMLVCUSTOMDRAW *>(l);
-            if (draw->nmcd.dwDrawStage == CDDS_PREPAINT)
-                return CDRF_NOTIFYITEMDRAW;
-            if (draw->nmcd.dwDrawStage == CDDS_ITEMPREPAINT)
-            {
-                draw->clrTextBk =
-                    draw->nmcd.dwItemSpec % 2 ? GetSysColor(COLOR_BTNFACE) : GetSysColor(COLOR_WINDOW);
-                return CDRF_NEWFONT;
-            }
+            return SensorDraw(*reinterpret_cast<NMLVCUSTOMDRAW *>(l));
         }
         Notify(hdr);
         return 0;
@@ -2187,6 +2225,7 @@ int App::Audit()
           "Tooltip registrations cleaned during navigation");
     check(fatal_.empty(), "No callback errors");
     RegressionAudit(out);
+    SensorAudit(out);
     check(GetForegroundWindow() == foreground, "Foreground HWND unchanged throughout audit");
     POINT end{};
     GetCursorPos(&end);

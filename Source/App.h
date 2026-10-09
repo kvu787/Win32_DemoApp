@@ -50,6 +50,9 @@ class App
     int page_ = 0, scrollX_ = 0, scrollY_ = 0, height_ = 640, split_ = 245, sortColumn_ = 0;
     bool sortingAscending_ = true, dragging_ = false, navigating_ = false, sensorExpanded_ = true;
     bool dpiGeometryPending_ = false;
+    bool sensorCellMode_ = false, sensorUpdating_ = false;
+    LPARAM sensorKey_ = 100;
+    int sensorColumn_ = 0;
     int creationCount_ = 0;
     std::vector<Child> children_;
     struct SpecimenFont
@@ -82,6 +85,24 @@ class App
     bool SplitterHit(int logicalX) const;
     void ShowMain();
     void RegressionAudit(std::ostream &report);
+    void SensorAudit(std::ostream &report);
+    struct SensorCell
+    {
+        int row = -1, column = -1;
+    };
+    LPARAM SensorKey(HWND list, int row) const;
+    int SensorIndex(HWND list, LPARAM key) const;
+    bool SensorRect(HWND list, int row, int column, RECT &rect) const;
+    SensorCell SensorHit(HWND list, POINT point) const;
+    void SensorMode(bool cell);
+    void SensorSelect(HWND list, int row, int column);
+    void SensorRestore(HWND list);
+    void SensorLabel(HWND list);
+    bool SensorKeyDown(HWND list, UINT key);
+    void SensorMouse(HWND list, POINT point, bool doubleClick);
+    void SensorToggle(HWND list);
+    LRESULT SensorDraw(NMLVCUSTOMDRAW &draw);
+    static LRESULT CALLBACK SensorProc(HWND, UINT, WPARAM, LPARAM, UINT_PTR, DWORD_PTR);
     void Event(const std::wstring &event);
     void Command(int id, int notification, HWND control);
     void Notify(NMHDR *notification);

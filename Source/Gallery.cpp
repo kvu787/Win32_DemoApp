@@ -101,13 +101,14 @@ const std::vector<Page> &Pages()
          L"control concepts with two original pages.",
          L"https://learn.microsoft.com/en-us/windows/win32/controls/property-sheets"},
         {L"Sensors / details layout", L"Screenshot-inspired native/custom composition",
-         L"SysListView32 / LVS_REPORT / NM_CUSTOMDRAW; app-managed hierarchy and row striping; owned tool "
+         L"SysListView32 / LVS_REPORT / LVS_EX_FULLROWSELECT / LVM_SUBITEMHITTEST / NM_CUSTOMDRAW; owned tool "
          L"windows; msctls_progress32",
          L"Inspired by HWiNFO: report columns, icons, read-only summary fields, a combo box and floating "
-         L"meters. The sensor table uses a native list view plus application-managed hierarchical expansion "
-         L"and alternating row colors. Win32 has no built-in tree-grid or cell-selection table. Values are "
-         L"fixed dummy data; the original app's actual implementation remains uncertain. Double-click or "
-         L"press Enter on a group row to expand/collapse.",
+         L"meters. Compare native Row selection with an app-managed single active Cell: click any of four "
+         L"columns or use arrow keys, then read the selected value. Hit testing/custom drawing extend the "
+         L"native report list; cell state and hierarchy belong to the app. Win32 has no stock spreadsheet "
+         L"control. Double-click or Enter toggles the dummy CPU group. No editing/multiselection. The "
+         L"original app's actual implementation remains uncertain.",
          L"https://learn.microsoft.com/en-us/windows/win32/controls/custom-draw"},
         {L"Custom drawing / platform", L"Platform features and application drawing",
          L"WM_PAINT / GDI; WM_DPICHANGED; SystemParametersInfoForDpi; IsDialogMessage; MSAA/UI Automation; "
@@ -148,6 +149,8 @@ const std::vector<InventoryItem> &Inventory()
         {L"Menus / title bar / system menu", L"HMENU / WS_OVERLAPPEDWINDOW", L"Live"},
         {L"Split panes / tiles / sensor hierarchy", L"App-defined composition",
          L"Live; explicitly custom where needed"},
+        {L"Native row / single active sensor cell", L"SysListView32 + hit test/custom draw",
+         L"Live; single cell is app-managed"},
         {L"Print / page setup / print job", L"PrintDlgEx / PageSetupDlg",
          L"Documented only; no printer interaction"},
         {L"Wizard / TaskDialog advanced combinations", L"PSH_WIZARD / advanced TASKDIALOGCONFIG",

@@ -12,7 +12,7 @@ try {
     & rc.exe /nologo /fo (Join-Path $output 'App.res') App.rc
     if ($LASTEXITCODE -ne 0) { throw 'Resource compilation failed.' }
     $flags = if ($Configuration -eq 'Release') { @('/O2','/MT') } else { @('/Od','/MTd','/Zi') }
-    & cl.exe /nologo /std:c++20 /W4 /permissive- /utf-8 /EHsc /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DNOMINMAX /D_WIN32_WINNT=0x0A00 @flags ("/Fo$output\") ("/Fe$output\Win32_DemoApp.exe") ("/Fd$output\Win32_DemoApp.pdb") Main.cpp Gallery.cpp TextSearch.cpp Regression.cpp App.cpp (Join-Path $output 'App.res') /link /SUBSYSTEM:WINDOWS /MANIFEST:NO comctl32.lib comdlg32.lib shell32.lib ole32.lib uuid.lib uxtheme.lib dwmapi.lib user32.lib gdi32.lib
+    & cl.exe /nologo /std:c++20 /W4 /permissive- /utf-8 /EHsc /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DNOMINMAX /D_WIN32_WINNT=0x0A00 @flags ("/Fo$output\") ("/Fe$output\Win32_DemoApp.exe") ("/Fd$output\Win32_DemoApp.pdb") Main.cpp Gallery.cpp TextSearch.cpp Regression.cpp Sensors.cpp SensorRegression.cpp App.cpp (Join-Path $output 'App.res') /link /SUBSYSTEM:WINDOWS /MANIFEST:NO comctl32.lib comdlg32.lib shell32.lib ole32.lib uuid.lib uxtheme.lib dwmapi.lib user32.lib gdi32.lib
     if ($LASTEXITCODE -ne 0) { throw 'C++ build failed.' }
 } finally { Pop-Location }
 if ($Test) {

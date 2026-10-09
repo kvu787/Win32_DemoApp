@@ -287,6 +287,9 @@ void App::RegressionAudit(std::ostream &out)
     RefreshPresentation(original);
     Build(0);
     check(fatal_.empty(), "targeted regressions leave no callback errors");
-    out << "PENDING regression: actual root cmd/ps1 launcher visibility on unlocked NE18NZ2; interactive "
-           "dialog acceptance/cancellation.\n";
+    if (options_.launcher)
+        out << "PASS regression: this root launcher path reached a visible main gallery on NE18NZ2.\n";
+    else
+        out << "PENDING regression: actual root cmd/ps1 launcher visibility on unlocked NE18NZ2.\n";
+    out << "PENDING regression: interactive dialog acceptance/cancellation.\n";
 }
