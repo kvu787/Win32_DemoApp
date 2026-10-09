@@ -19,6 +19,8 @@ File/open/save/folder examples only return a selected path; they never open or w
 
 Sensors/details includes native Row and app-managed Cell modes. Click any of the four columns or use arrow keys in Cell mode; the label reports the active value. Enter/double-click the CPU group toggles its dummy children. Row selection belongs to the native report list; single-cell state/highlighting belongs to this app. Values remain read-only. See Documentation/SensorSelection.md for the distinction and test limits.
 
+The gallery has 15 topics. Virtual / owner-data list compares a stored report with a genuine LVS_OWNERDATA report containing 1,000 generated records. Click headings to sort while retaining the selected record; scroll down for its value label and first/last buttons. Windows draws the control while the app supplies requested text through LVN_GETDISPINFO. See Documentation/OwnerData.md.
+
 ## Build
 
 Use modern PowerShell (`pwsh`) with an existing Visual Studio C++ x64 toolchain and Windows SDK:

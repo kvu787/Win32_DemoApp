@@ -1,5 +1,7 @@
 # Review corrections
 
+The initial locked-desktop status below is historical. Current coverage/tests and remaining manual checks are recorded in Verification.md and the final repository Checkpoint.md. A ready snapshot has fresh GUI and actual root launcher reports; hidden candidates do not.
+
 Six independent review findings were corrected after the first verified snapshot. The machine remained locked throughout this correction pass. Hidden native-control checks passed in Release and Debug; visible acceptance remains pending. No desktop, focus, cursor, keyboard or security manipulation was performed.
 
 1. The root PowerShell launcher no longer specifies a hidden startup window. Both root launchers expose a restricted NE18NZ2 test mode which uses the real first-show path and asserts that the main window is visible and not minimized. Visible tests refuse a locked/unavailable input desktop. These actual launcher tests have not yet run.
