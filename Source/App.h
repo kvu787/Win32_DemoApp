@@ -49,6 +49,7 @@ class App
     UINT dpi_ = 96, findMessage_ = 0;
     int page_ = 0, scrollX_ = 0, scrollY_ = 0, height_ = 640, split_ = 245, sortColumn_ = 0;
     bool sortingAscending_ = true, dragging_ = false, navigating_ = false, sensorExpanded_ = true;
+    bool dpiGeometryPending_ = false;
     int creationCount_ = 0;
     std::vector<Child> children_;
     struct SpecimenFont
@@ -72,7 +73,7 @@ class App
     void Layout();
     void LayoutChildren();
     void MakeFonts();
-    void RefreshPresentation(UINT dpi);
+    void RefreshPresentation(UINT dpi, const RECT *suggested = nullptr);
     void RefreshImages();
     bool UpdatePreview();
     void AcceptDemoColor(COLORREF color);

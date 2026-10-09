@@ -157,6 +157,71 @@ void App::RegressionAudit(std::ostream &out)
               GetObjectType(font_) == OBJ_FONT,
           "composite-control font/DPI refresh preserves selection and body font lifetime");
 
+    // Suggested rectangles can exceed the test display; exercise these messages only on hidden HWNDs.
+    if (!options_.visible)
+    {
+        RECT initialGeometry{};
+        GetWindowRect(window_, &initialGeometry);
+        RefreshPresentation(96);
+        check(SetWindowPos(window_, nullptr, initialGeometry.left, initialGeometry.top, 1400, 680,
+                           SWP_NOZORDER | SWP_NOACTIVATE) != FALSE,
+              "hidden DPI handler fixture geometry applies");
+        Build(2);
+        auto retainedEdit = GetDlgItem(panel_, 201), retainedPassword = GetDlgItem(panel_, 202),
+             retainedMultiline = GetDlgItem(panel_, 203);
+        SetWindowTextW(retainedEdit, L"retain through the actual DPI handler");
+        SetWindowTextW(retainedPassword, L"retained password");
+        SetWindowTextW(retainedMultiline, L"retained\r\nmultiline\r\ninput");
+        SendMessageW(retainedEdit, EM_SETSEL, 7, 14);
+        split_ = 650;
+        scrollX_ = 140;
+        scrollY_ = 200;
+        Layout();
+        check(split_ == 650 && scrollX_ == 140 && scrollY_ == 200,
+              "hidden handler fixture starts with an unclipped splitter and deep scroll");
+        const HWND retainedFocus = GetFocus();
+        for (int cycle = 0; cycle < 2; ++cycle)
+            for (UINT nextDpi : {192u, 96u})
+            {
+                const int factor = int(nextDpi / 96);
+                RECT suggested{initialGeometry.left, initialGeometry.top,
+                               initialGeometry.left + 1400 * factor, initialGeometry.top + 680 * factor};
+                SendMessageW(window_, WM_DPICHANGED, MAKEWPARAM(nextDpi, nextDpi),
+                             reinterpret_cast<LPARAM>(&suggested));
+                RECT applied{};
+                GetWindowRect(window_, &applied);
+                out << "DPI handler geometry: dpi=" << dpi_
+                    << " requested=" << suggested.right - suggested.left << 'x'
+                    << suggested.bottom - suggested.top << " applied=" << applied.right - applied.left << 'x'
+                    << applied.bottom - applied.top << " split=" << split_ << " scroll=" << scrollX_ << ','
+                    << scrollY_ << '\n';
+                check(dpi_ == nextDpi && EqualRect(&applied, &suggested),
+                      nextDpi == 192 ? "actual hidden WM_DPICHANGED applies the 96-to-192 rectangle"
+                                     : "actual hidden WM_DPICHANGED applies the 192-to-96 rectangle");
+                check(split_ == 650 && scrollX_ == 140 && scrollY_ == 200,
+                      nextDpi == 192 ? "96-to-192 handler retains logical splitter and deep scrolling"
+                                     : "192-to-96 handler retains logical splitter and deep scrolling");
+                check(GetDlgItem(panel_, 201) == retainedEdit &&
+                          GetDlgItem(panel_, 202) == retainedPassword &&
+                          GetDlgItem(panel_, 203) == retainedMultiline &&
+                          Text(retainedEdit) == L"retain through the actual DPI handler" &&
+                          Text(retainedPassword) == L"retained password" &&
+                          Text(retainedMultiline) == L"retained\r\nmultiline\r\ninput" &&
+                          Selection(retainedEdit) == std::pair<DWORD, DWORD>{7, 14},
+                      "actual DPI handler retains native input HWNDs, buffers and selection");
+                check(GetFocus() == retainedFocus && IsWindow(retainedEdit),
+                      "actual DPI handler leaves calling-thread focus identity unchanged without injection");
+            }
+        out << "DPI handler focus fixture=" << (retainedFocus ? "existing thread focus" : "no thread focus")
+            << "; actual focused keyboard interaction remains unverified.\n";
+        SetWindowPos(window_, nullptr, initialGeometry.left, initialGeometry.top,
+                     initialGeometry.right - initialGeometry.left,
+                     initialGeometry.bottom - initialGeometry.top, SWP_NOZORDER | SWP_NOACTIVATE);
+        split_ = 245;
+        RefreshPresentation(original);
+        Build(3); // Keep a composite-font specimen alive for the existing owned-font lifetime checks.
+    }
+
     const auto initialFloating = floating_.size();
     FloatingDemo(901);
     FloatingDemo(1205);

@@ -374,10 +374,24 @@ void App::RefreshImages()
     images_ = next;
     ImageList_Destroy(swap.oldList);
 }
-void App::RefreshPresentation(UINT dpi)
+void App::RefreshPresentation(UINT dpi, const RECT *suggested)
 {
     const UINT previous = dpi_;
     dpi_ = dpi;
+    if (suggested)
+    {
+        // Minimum tracking dimensions must use the new DPI. Synchronous WM_SIZE must wait for final geometry.
+        dpiGeometryPending_ = true;
+        const BOOL moved = SetWindowPos(window_, nullptr, suggested->left, suggested->top,
+                                        suggested->right - suggested->left,
+                                        suggested->bottom - suggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
+        dpiGeometryPending_ = false;
+        if (!moved)
+        {
+            dpi_ = previous;
+            throw std::runtime_error("DPI suggested geometry failed.");
+        }
+    }
     MakeFonts();
     RefreshImages();
     if (previous != dpi_)
@@ -1002,7 +1016,7 @@ void App::Build(int page)
 }
 void App::Layout()
 {
-    if (!panel_)
+    if (!panel_ || dpiGeometryPending_)
         return;
     RECT r{};
     GetClientRect(window_, &r);
@@ -1749,11 +1763,7 @@ LRESULT App::MainMessage(HWND h, UINT m, WPARAM w, LPARAM l)
     }
     case WM_DPICHANGED:
     {
-        RefreshPresentation(HIWORD(w));
-        auto r = reinterpret_cast<RECT *>(l);
-        SetWindowPos(h, nullptr, r->left, r->top, r->right - r->left, r->bottom - r->top,
-                     SWP_NOZORDER | SWP_NOACTIVATE);
-        Layout();
+        RefreshPresentation(HIWORD(w), reinterpret_cast<const RECT *>(l));
         return 0;
     }
     case WM_SETTINGCHANGE:
