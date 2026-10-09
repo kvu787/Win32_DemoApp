@@ -101,7 +101,8 @@ const std::vector<Page> &Pages()
          L"control concepts with two original pages.",
          L"https://learn.microsoft.com/en-us/windows/win32/controls/property-sheets"},
         {L"Sensors / details layout", L"Screenshot-inspired native/custom composition",
-         L"SysListView32 / LVS_REPORT / LVS_EX_FULLROWSELECT / LVM_SUBITEMHITTEST / NM_CUSTOMDRAW; owned tool "
+         L"SysListView32 / LVS_REPORT / LVS_EX_FULLROWSELECT / LVM_SUBITEMHITTEST / NM_CUSTOMDRAW; owned "
+         L"tool "
          L"windows; msctls_progress32",
          L"Inspired by HWiNFO: report columns, icons, read-only summary fields, a combo box and floating "
          L"meters. Compare native Row selection with an app-managed single active Cell: click any of four "
@@ -118,7 +119,15 @@ const std::vector<Page> &Pages()
          L"System message fonts, system colors, Common Controls v6, and Per-Monitor V2 awareness are active "
          L"throughout. Clipboard, drag/drop, IME, accessibility, touch, Ribbon, WebView and Direct2D are "
          L"broader platform topics, not additional universal USER32 controls; see the exclusions inventory.",
-         L"https://learn.microsoft.com/en-us/windows/win32/controls/user-controls-intro"}};
+         L"https://learn.microsoft.com/en-us/windows/win32/controls/user-controls-intro"},
+        {L"Virtual / owner-data list", L"Native common control with application-supplied data",
+         L"SysListView32 / LVS_REPORT / LVS_OWNERDATA; LVM_SETITEMCOUNT; LVN_GETDISPINFO; LVN_COLUMNCLICK",
+         L"Compare an ordinary populated report with a virtual report containing 1,000 generated dummy "
+         L"records. Windows keeps native selection/focus and draws the control; the app owns the ID map "
+         L"and generates requested text through LVN_GETDISPINFO. Click headers to sort the model while "
+         L"preserving the selected record. Owner-data is about data, not owner-drawing/custom drawing. "
+         L"There is no row HWND, external data I/O, editing, filtering or benchmark UI.",
+         L"https://learn.microsoft.com/en-us/windows/win32/controls/list-view-controls-overview"}};
     return pages;
 }
 const std::vector<InventoryItem> &Inventory()
@@ -157,8 +166,9 @@ const std::vector<InventoryItem> &Inventory()
          L"Documented only"},
         {L"Flat scrollbars / drag list", L"InitializeFlatSB / MakeDragList",
          L"Documented only; legacy helpers"},
-        {L"Owner-draw permutations / virtual list", L"WM_DRAWITEM / LVS_OWNERDATA",
-         L"Documented only; custom draw shown"},
+        {L"Virtual / owner-data report list", L"LVS_OWNERDATA / LVN_GETDISPINFO",
+         L"Live; native drawing, generated data and stable-ID sort"},
+        {L"Owner-draw permutations", L"WM_DRAWITEM", L"Documented only; custom draw shown"},
         {L"Ribbon / Explorer browser / ActiveX", L"UI Ribbon / IExplorerBrowser / COM hosting",
          L"Documented only; separate frameworks"},
         {L"Tray / clipboard / OLE drag/drop / IME", L"Shell_NotifyIcon / clipboard / IDropTarget / IME",

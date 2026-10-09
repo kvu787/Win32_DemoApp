@@ -53,6 +53,12 @@ class App
     bool sensorCellMode_ = false, sensorUpdating_ = false;
     LPARAM sensorKey_ = 100;
     int sensorColumn_ = 0;
+    static constexpr int VirtualRows = 1000;
+    static constexpr UINT VirtualStatsMessage = WM_APP + 31;
+    std::vector<int> virtualOrder_;
+    int virtualSelected_ = 0, virtualSortColumn_ = 0;
+    bool virtualAscending_ = true, virtualUpdating_ = false, virtualStatsPending_ = false;
+    unsigned long long virtualRequests_ = 0, virtualRejected_ = 0;
     int creationCount_ = 0;
     std::vector<Child> children_;
     struct SpecimenFont
@@ -86,6 +92,14 @@ class App
     void ShowMain();
     void RegressionAudit(std::ostream &report);
     void SensorAudit(std::ostream &report);
+    void VirtualAudit(std::ostream &report);
+    std::wstring VirtualText(int id, int column) const;
+    int VirtualId(int row) const;
+    void VirtualBind(HWND list);
+    void VirtualSelect(HWND list, int row);
+    void VirtualSort(HWND list, int column);
+    void VirtualLabels();
+    bool VirtualNotify(NMHDR *notification, LRESULT &result);
     struct SensorCell
     {
         int row = -1, column = -1;

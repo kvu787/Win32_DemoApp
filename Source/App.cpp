@@ -1024,6 +1024,34 @@ void App::Build(int page)
         SetWindowLongPtrW(children_.back().hwnd, GWLP_ID, 1310);
         break;
     }
+    case 14:
+    {
+        Label(L"Populated report: Windows stores item text (same sample as Tree / report)", 16, 12);
+        auto stored = Add(WC_LISTVIEWW, L"Populated comparison",
+                          WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS, 1402, 16, 48, 835, 135,
+                          WS_EX_CLIENTEDGE);
+        ListView_SetExtendedListViewStyle(stored, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+        Columns(stored, {{L"Name", S(270)}, {L"Library", S(230)}, {L"Purpose", S(310)}});
+        PopulateReport(stored, false);
+        Label(L"Owner-data report: application supplies requested text; Windows still draws the control", 16,
+              210);
+        auto list = Add(WC_LISTVIEWW, L"Virtual owner-data comparison",
+                        WS_TABSTOP | LVS_REPORT | LVS_OWNERDATA | LVS_SINGLESEL | LVS_SHOWSELALWAYS, 1401, 16,
+                        246, 835, 240, WS_EX_CLIENTEDGE);
+        ListView_SetExtendedListViewStyle(list, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+        Columns(list, {{L"Stable record ID", S(330)}, {L"Category", S(235)}, {L"Generated value", S(245)}});
+        Add(L"Static", L"", SS_LEFT, 1403, 16, 515, 835, 55);
+        Add(L"Static", L"", SS_LEFT, 1404, 16, 585, 835, 55);
+        Button(L"Select &first row", 1405, 16, 657, 300);
+        Button(L"Select &last row", 1406, 346, 657, 300);
+        Label(L"Click a generated header to sort ascending/descending. The app sorts its ID map and keeps "
+              L"the same record selected. LVN_GETDISPINFO generates only requested row/column text. "
+              L"Owner-data describes data ownership; owner-draw / NM_CUSTOMDRAW describe painting. "
+              L"These 1,000 dummy rows use no external I/O, editing, filtering or benchmark machinery.",
+              16, 715, 835, 105);
+        VirtualBind(list);
+        break;
+    }
     }
     for (const auto &c : children_)
         height_ = std::max(height_, c.y + c.h + 28);
@@ -1321,6 +1349,12 @@ void App::Command(int id, int code, HWND control)
         SensorMode(id == 1211);
         Event(sensorCellMode_ ? L"Cell mode: application-managed active cell and custom draw."
                               : L"Row mode: native report-list selection.");
+        return;
+    }
+    if (id == 1405 || id == 1406)
+    {
+        if (auto list = GetDlgItem(panel_, 1401))
+            VirtualSelect(list, id == 1405 ? 0 : ListView_GetItemCount(list) - 1);
         return;
     }
     if (id == 403 || id == 404 || id == 405)
@@ -1753,6 +1787,10 @@ LRESULT App::MainMessage(HWND h, UINT m, WPARAM w, LPARAM l)
     }
     switch (m)
     {
+    case VirtualStatsMessage:
+        virtualStatsPending_ = false;
+        VirtualLabels();
+        return 0;
     case WM_SIZE:
         Layout();
         return 0;
@@ -1849,6 +1887,9 @@ LRESULT App::PanelMessage(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_NOTIFY:
     {
         auto hdr = reinterpret_cast<NMHDR *>(l);
+        LRESULT virtualResult = 0;
+        if (VirtualNotify(hdr, virtualResult))
+            return virtualResult;
         if (hdr->idFrom == 1201 && hdr->code == NM_CUSTOMDRAW)
         {
             return SensorDraw(*reinterpret_cast<NMLVCUSTOMDRAW *>(l));
@@ -2218,14 +2259,15 @@ int App::Audit()
         Pump();
     }
     check(GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS) <= gdi + 2,
-          "GDI lifetime stable across 112 page recreations");
+          "GDI lifetime stable across " + std::to_string(Pages().size() * 8) + " topic recreations");
     check(GetGuiResources(GetCurrentProcess(), GR_USEROBJECTS) <= user + 2,
-          "USER lifetime stable across 112 page recreations");
+          "USER lifetime stable across " + std::to_string(Pages().size() * 8) + " topic recreations");
     check(SendMessageW(tooltip_, TTM_GETTOOLCOUNT, 0, 0) == 0,
           "Tooltip registrations cleaned during navigation");
     check(fatal_.empty(), "No callback errors");
     RegressionAudit(out);
     SensorAudit(out);
+    VirtualAudit(out);
     check(GetForegroundWindow() == foreground, "Foreground HWND unchanged throughout audit");
     POINT end{};
     GetCursorPos(&end);
