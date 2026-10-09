@@ -17,6 +17,8 @@ Select a topic in the left tree. Read the family, class names, API identifiers a
 
 File/open/save/folder examples only return a selected path; they never open or write that path. Color/font choices affect a temporary preview. Find/replace operates on a temporary text buffer. The property sheet changes only its own temporary controls. Cancel is designed to leave application/system state unchanged. There are no printer calls or actual hardware controls.
 
+Sensors/details includes native Row and app-managed Cell modes. Click any of the four columns or use arrow keys in Cell mode; the label reports the active value. Enter/double-click the CPU group toggles its dummy children. Row selection belongs to the native report list; single-cell state/highlighting belongs to this app. Values remain read-only. See Documentation/SensorSelection.md for the distinction and test limits.
+
 ## Build
 
 Use modern PowerShell (`pwsh`) with an existing Visual Studio C++ x64 toolchain and Windows SDK:
