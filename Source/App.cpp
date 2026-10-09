@@ -1777,10 +1777,11 @@ int App::Run()
             }
         if (consumed)
             continue;
-        if (IsDialogMessageW(window_, &msg))
-            continue;
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
+        if (!IsDialogMessageW(window_, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
         auto focused = GetFocus();
         if (focused && IsChild(panel_, focused))
         {
