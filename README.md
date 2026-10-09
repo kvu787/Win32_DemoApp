@@ -33,14 +33,16 @@ pwsh -NoProfile -File .\Build.ps1 -Configuration Debug -Test
 ## Verification and ready snapshots
 
 ```powershell
-pwsh -NoProfile -File .\PublishBuild.ps1
+pwsh -NoProfile -File .\PublishBuild.ps1 -GuiAudit
 ```
 
-Publication requires a clean committed source tree. It builds/tests, copies into a new uniquely named `TestBuilds` directory, verifies the copied executable from a different working directory, records source commit and SHA-256, then marks snapshot files read-only. Ready folders are never overwritten. The only mutable pointer is `TestBuilds/LatestReady.json`. These directories are gitignored.
+Publication requires a clean committed source tree and an unlocked, cleared NE18NZ2 test slot. It builds/tests, copies into a new uniquely named `TestBuilds` directory, verifies the copied executable from a different working directory, tests both root launchers, records source commit and SHA-256, then marks snapshot files read-only. Ready folders are never overwritten. The only mutable pointer is `TestBuilds/LatestReady.json`. These directories are gitignored.
 
-The executable supports `--self-test --report path` for hidden noninteractive checks. `--gui-test --report path` is restricted to the exact NE18NZ2 monitor identity; it refuses visible testing if that monitor is absent, shows without activation, injects no input and captures only its own window through PrintWindow. Do not use an ordinary launch for assistant testing. The GUI audit exits and closes its windows when complete.
+While the machine is locked, use `PublishBuild.ps1 -Candidate`. This runs hidden checks and produces an immutable directory prefixed `Candidate_` with `Ready: false` and `GuiAudit: false` in BuildInfo.json. It never updates the verified-build pointer. Candidate builds are runnable but their corrected GUI behavior has not been visually verified.
 
-The audit checks control creation/classes, v6 activation, manifest awareness, state changes, dependent enabled state, report/icon view changes, scrolling, synthetic 96/144/192 DPI font/layout reconstruction, repeated navigation and stable GDI/USER object counts. See the copied audit reports and `Documentation/Verification.md` for actual outcomes and limits. Synthetic DPI checks do not replace real monitor-transition testing. Automated dialog tests intentionally do not open modal dialogs on the user's interactive desktop.
+The executable supports `--self-test --report path` for hidden noninteractive checks. `--gui-test --report path` is restricted to an unlocked input desktop and the exact NE18NZ2 monitor identity; it refuses visible testing otherwise, shows without activation, injects no input and captures only its own window through PrintWindow. Do not use an ordinary launch for assistant testing. The GUI audit exits and closes its windows when complete. Root launcher verification uses `RunLatestBuild.ps1 -TestMonitor NE18NZ2 -TestBuildDirectory <snapshot> -Report <report>`; RunLatestBuild.cmd forwards the same arguments. That mode uses the ordinary first-show path with test-only no-activation behavior and asserts that the window is visible.
+
+The audit checks control creation/classes, v6 activation, manifest awareness, state changes, dependent enabled state, report/icon view changes, scrolling, synthetic 96/144/192 DPI font/layout refresh, repeated navigation and stable GDI/USER object counts. Targeted regressions cover Find/Replace options, local previews, state preservation, owned-window fonts and splitter hit testing. See the copied audit reports and `Documentation/Verification.md` for actual outcomes and limits. Synthetic DPI checks do not replace real monitor-transition testing. Automated dialog tests intentionally do not open modal dialogs on the user's interactive desktop.
 
 ## Learn more
 

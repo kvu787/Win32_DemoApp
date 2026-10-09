@@ -1,2 +1,2 @@
 @echo off
-pwsh -NoProfile -File "%~dp0RunLatestBuild.ps1"
+pwsh -NoProfile -File "%~dp0RunLatestBuild.ps1" %*
