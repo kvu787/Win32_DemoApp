@@ -1,0 +1,37 @@
+#include <windows.h>
+#include <commctrl.h>
+1 RT_MANIFEST "App.manifest"
+201 AVI "Demo.avi"
+101 DIALOGEX 0, 0, 270, 174
+STYLE DS_SETFONT | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Pointer Options"
+FONT 9, "Segoe UI"
+BEGIN
+    GROUPBOX "Motion", -1, 8, 8, 254, 58
+    LTEXT "Select a demo pointer speed:", -1, 16, 22, 220, 12
+    CONTROL "", 301, TRACKBAR_CLASS, WS_TABSTOP | TBS_AUTOTICKS, 24, 36, 216, 22
+    LTEXT "Slow", -1, 18, 53, 30, 10
+    LTEXT "Fast", -1, 228, 53, 26, 10
+    GROUPBOX "Snap To", -1, 8, 70, 254, 36
+    CONTROL "Automatically move to the demo default button", 302, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 16, 83, 238, 14
+    GROUPBOX "Visibility", -1, 8, 111, 254, 54
+    CONTROL "Display demo pointer trails", 303, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 16, 125, 232, 12
+    CONTROL "", 304, TRACKBAR_CLASS, WS_TABSTOP | TBS_AUTOTICKS, 24, 140, 210, 20
+END
+103 DIALOGEX 0, 0, 260, 110
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Ordinary modal dialog / #32770"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT "DialogBoxParamW creates a modal dialog from a resource template.\n\nTab moves between buttons. Enter accepts; Escape cancels. No values are saved.", -1, 12, 12, 236, 62
+    DEFPUSHBUTTON "OK", IDOK, 94, 84, 70, 16
+    PUSHBUTTON "Cancel", IDCANCEL, 176, 84, 70, 16
+END
+102 DIALOGEX 0, 0, 270, 174
+STYLE DS_SETFONT | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "About this demo"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT "PropertySheetW creates a real #32770 property sheet with a SysTabControl32 and OK, Cancel, Apply buttons.\n\nChange a setting on Pointer Options to enable Apply. Apply affects only this temporary dialog. Cancel discards its values.", -1, 12, 14, 242, 108
+    LTEXT "No actual mouse, GPU, device or system settings are read or changed.", -1, 12, 130, 242, 32
+END

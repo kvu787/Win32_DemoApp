@@ -1,0 +1,5 @@
+BasedOnStyle: Microsoft
+ColumnLimit: 110
+BreakBeforeBraces: Allman
+AllowShortFunctionsOnASingleLine: None
+SortIncludes: Never
