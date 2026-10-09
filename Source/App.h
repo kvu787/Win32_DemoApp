@@ -3,6 +3,7 @@
 #include <commctrl.h>
 #include <commdlg.h>
 #include <filesystem>
+#include <iosfwd>
 #include <string>
 #include <vector>
 struct Display
@@ -17,6 +18,7 @@ struct Options
 {
     bool test = false;
     bool visible = false;
+    bool launcher = false;
     std::filesystem::path report;
 };
 class App
@@ -70,6 +72,15 @@ class App
     void Layout();
     void LayoutChildren();
     void MakeFonts();
+    void RefreshPresentation(UINT dpi);
+    void RefreshImages();
+    bool UpdatePreview();
+    void AcceptDemoColor(COLORREF color);
+    void AcceptDemoFont(const LOGFONTW &description);
+    void HandleFind(const FINDREPLACEW &request);
+    bool SplitterHit(int logicalX) const;
+    void ShowMain();
+    void RegressionAudit(std::ostream &report);
     void Event(const std::wstring &event);
     void Command(int id, int notification, HWND control);
     void Notify(NMHDR *notification);

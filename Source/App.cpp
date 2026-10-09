@@ -1,5 +1,6 @@
 #include "App.h"
 #include "Gallery.h"
+#include "TextSearch.h"
 #include <algorithm>
 #include <array>
 #include <dwmapi.h>
@@ -298,24 +299,157 @@ void App::MakeFonts()
     auto old = font_, oldBold = bold_;
     font_ = normal;
     bold_ = bold;
-    EnumChildWindows(
-        window_,
-        [](HWND h, LPARAM context) -> BOOL
-        {
-            auto self = reinterpret_cast<App *>(context);
-            for (const auto &isolated : self->specimenFonts_)
-                if (h == isolated.hwnd || IsChild(isolated.hwnd, h))
-                    return TRUE;
-            SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(self->font_), TRUE);
-            return TRUE;
-        },
-        reinterpret_cast<LPARAM>(this));
+    for (auto &isolated : specimenFonts_)
+    {
+        LOGFONTW description{};
+        GetObjectW(font_, sizeof(description), &description);
+        auto replacement = CreateFontIndirectW(&description);
+        if (!replacement)
+            throw std::runtime_error("Specimen font refresh failed.");
+        SendMessageW(isolated.hwnd, WM_SETFONT, reinterpret_cast<WPARAM>(replacement), TRUE);
+        if (GetObjectType(isolated.font) == OBJ_FONT)
+            DeleteObject(isolated.font);
+        isolated.font = replacement;
+    }
+    const auto applyFont = [](HWND h, LPARAM context) -> BOOL
+    {
+        auto self = reinterpret_cast<App *>(context);
+        for (const auto &isolated : self->specimenFonts_)
+            if (h == isolated.hwnd || IsChild(isolated.hwnd, h))
+                return TRUE;
+        const auto font = GetDlgCtrlID(h) == 1011 && self->demoFont_ ? self->demoFont_ : self->font_;
+        SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+        return TRUE;
+    };
+    EnumChildWindows(window_, applyFont, reinterpret_cast<LPARAM>(this));
+    for (auto floating : floating_)
+        if (IsWindow(floating))
+            EnumChildWindows(floating, applyFont, reinterpret_cast<LPARAM>(this));
     if (heading_)
         SendMessageW(heading_, WM_SETFONT, reinterpret_cast<WPARAM>(bold_), TRUE);
     if (old)
         DeleteObject(old);
     if (oldBold)
         DeleteObject(oldBold);
+}
+void App::RefreshImages()
+{
+    int width = 0, height = 0;
+    ImageList_GetIconSize(images_, &width, &height);
+    if (width == S(16) && height == S(16))
+        return;
+    auto next = ImageList_Create(S(16), S(16), ILC_COLOR32 | ILC_MASK, 4, 1);
+    if (!next)
+        throw std::runtime_error("DPI image-list allocation failed.");
+    for (auto icon : {IDI_APPLICATION, IDI_INFORMATION, IDI_WARNING, IDI_QUESTION})
+        ImageList_AddIcon(next, LoadIconW(nullptr, icon));
+    struct Swap
+    {
+        HIMAGELIST oldList, nextList;
+    } swap{images_, next};
+    const auto update = [](HWND h, LPARAM context) -> BOOL
+    {
+        auto lists = reinterpret_cast<Swap *>(context);
+        const auto cls = ClassName(h);
+        if (cls == WC_TREEVIEWW)
+        {
+            if (TreeView_GetImageList(h, TVSIL_NORMAL) == lists->oldList)
+                TreeView_SetImageList(h, lists->nextList, TVSIL_NORMAL);
+        }
+        else if (cls == WC_LISTVIEWW)
+        {
+            for (int kind : {LVSIL_NORMAL, LVSIL_SMALL})
+                if (ListView_GetImageList(h, kind) == lists->oldList)
+                    ListView_SetImageList(h, lists->nextList, kind);
+        }
+        else if (cls == WC_COMBOBOXEXW &&
+                 reinterpret_cast<HIMAGELIST>(SendMessageW(h, CBEM_GETIMAGELIST, 0, 0)) == lists->oldList)
+            SendMessageW(h, CBEM_SETIMAGELIST, 0, reinterpret_cast<LPARAM>(lists->nextList));
+        return TRUE;
+    };
+    EnumChildWindows(window_, update, reinterpret_cast<LPARAM>(&swap));
+    for (auto floating : floating_)
+        if (IsWindow(floating))
+            EnumChildWindows(floating, update, reinterpret_cast<LPARAM>(&swap));
+    images_ = next;
+    ImageList_Destroy(swap.oldList);
+}
+void App::RefreshPresentation(UINT dpi)
+{
+    const UINT previous = dpi_;
+    dpi_ = dpi;
+    MakeFonts();
+    RefreshImages();
+    if (previous != dpi_)
+    {
+        struct Scale
+        {
+            UINT oldDpi, newDpi;
+        } scale{previous, dpi_};
+        const auto columns = [](HWND h, LPARAM parameter) -> BOOL
+        {
+            auto factor = reinterpret_cast<Scale *>(parameter);
+            if (ClassName(h) == WC_HEADERW)
+                for (int i = 0; i < Header_GetItemCount(h); ++i)
+                {
+                    HDITEMW item{};
+                    item.mask = HDI_WIDTH;
+                    if (Header_GetItem(h, i, &item))
+                    {
+                        item.cxy = MulDiv(item.cxy, factor->newDpi, factor->oldDpi);
+                        Header_SetItem(h, i, &item);
+                    }
+                }
+            return TRUE;
+        };
+        EnumChildWindows(window_, columns, reinterpret_cast<LPARAM>(&scale));
+        for (auto floating : floating_)
+            if (IsWindow(floating))
+                EnumChildWindows(floating, columns, reinterpret_cast<LPARAM>(&scale));
+    }
+    // Preserve HWND identities, edited values, selection and scroll positions during presentation changes.
+    Layout();
+    UpdatePreview();
+    if (auto description = GetDlgItem(panel_, 1310))
+    {
+        const int length = GetWindowTextLengthW(description);
+        std::wstring text(size_t(length) + 1, L'\0');
+        GetWindowTextW(description, text.data(), length + 1);
+        text.resize(length);
+        const auto fontMarker = text.find(L" / font:");
+        if (fontMarker != std::wstring::npos)
+            SetWindowTextW(description,
+                           (L"Current HWND DPI: " + std::to_wstring(dpi_) + text.substr(fontMarker)).c_str());
+    }
+}
+bool App::UpdatePreview()
+{
+    const HWND preview = GetDlgItem(panel_, 1011);
+    if (!preview)
+        return false;
+    SendMessageW(preview, WM_SETFONT, reinterpret_cast<WPARAM>(demoFont_ ? demoFont_ : font_), TRUE);
+    InvalidateRect(preview, nullptr, TRUE);
+    return true;
+}
+void App::AcceptDemoColor(COLORREF color)
+{
+    demoColor_ = color;
+    UpdatePreview();
+}
+void App::AcceptDemoFont(const LOGFONTW &description)
+{
+    auto selected = CreateFontIndirectW(&description);
+    if (!selected)
+        throw std::runtime_error("Sample font allocation failed.");
+    auto previous = demoFont_;
+    demoFont_ = selected;
+    UpdatePreview();
+    if (previous)
+        DeleteObject(previous);
+}
+bool App::SplitterHit(int logicalX) const
+{
+    return abs(logicalX - split_) < 10;
 }
 HWND App::Add(const wchar_t *cls, const wchar_t *text, DWORD style, int id, int x, int y, int w, int h,
               DWORD ex, HWND parent)
@@ -757,6 +891,9 @@ void App::Build(int page)
         }
         Add(L"Edit", L"Find and replace demo text. Search for demo. This demo stays in memory.",
             WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL, 1010, 16, 525, 800, 75, WS_EX_CLIENTEDGE);
+        Add(L"Static", L"Color / font preview (temporary)", SS_LEFT, 1011, 16, 625, 800, 50);
+        UpdatePreview();
+        Button(L"Ordinary &modal dialog", 1013, 16, 700, 360);
         break;
     }
     case 9:
@@ -824,10 +961,6 @@ void App::Build(int page)
         Label(L"Processor", 36, 352, 135);
         Add(L"Edit", L"Example CPU - 8 cores", WS_TABSTOP | ES_READONLY, 1202, 182, 349, 400, 27,
             WS_EX_CLIENTEDGE);
-        Add(L"Static", L"Color / font preview (temporary)", SS_LEFT, 1011, 16, 625, 800, 50);
-        if (demoFont_)
-            SendDlgItemMessageW(panel_, 1011, WM_SETFONT, reinterpret_cast<WPARAM>(demoFont_), TRUE);
-        Button(L"Ordinary &modal dialog", 1013, 16, 700, 360);
         Label(L"Memory", 36, 394, 135);
         Add(L"Edit", L"32 GB (demo)", WS_TABSTOP | ES_READONLY, 1203, 182, 391, 400, 27, WS_EX_CLIENTEDGE);
         Label(L"Profile", 36, 438, 135);
@@ -854,6 +987,7 @@ void App::Build(int page)
                L"fonts and system colors.")
                   .c_str(),
               16, 315, 820, 240);
+        SetWindowLongPtrW(children_.back().hwnd, GWLP_ID, 1310);
         break;
     }
     }
@@ -877,7 +1011,8 @@ void App::Layout()
     RECT bar{};
     GetWindowRect(toolbar_, &bar);
     const int top = MulDiv(bar.bottom - bar.top, 96, dpi_) + 8;
-    const int divider = std::clamp(split_, 150, std::max(150, width - 350));
+    split_ = std::clamp(split_, 150, std::max(150, width - 350));
+    const int divider = split_;
     auto place = [&](HWND h, int x, int y, int w, int hg)
     { MoveWindow(h, S(x), S(y), S(std::max(1, w)), S(std::max(1, hg)), TRUE); };
     place(tree_, 8, top, divider - 16, height - top - 31);
@@ -1022,8 +1157,7 @@ void App::OpenDialog(int id)
         color.rgbResult = demoColor_;
         if (ChooseColorW(&color))
         {
-            demoColor_ = color.rgbResult;
-            InvalidateRect(GetDlgItem(panel_, 1011), nullptr, TRUE);
+            AcceptDemoColor(color.rgbResult);
             Event(L"ChooseColorW changed the temporary preview color.");
         }
         else
@@ -1041,13 +1175,7 @@ void App::OpenDialog(int id)
         font.lpfnHook = CommonHook;
         if (ChooseFontW(&font))
         {
-            auto selected = CreateFontIndirectW(&lf);
-            if (!selected)
-                throw std::runtime_error("Sample font allocation failed.");
-            SendDlgItemMessageW(panel_, 1011, WM_SETFONT, reinterpret_cast<WPARAM>(selected), TRUE);
-            if (demoFont_)
-                DeleteObject(demoFont_);
-            demoFont_ = selected;
+            AcceptDemoFont(lf);
             Event(L"ChooseFontW changed the temporary preview font: " + std::wstring(lf.lfFaceName));
         }
         else
@@ -1282,9 +1410,8 @@ void App::Notify(NMHDR *hdr)
 }
 void App::FloatingDemo(int kind)
 {
-    if (options_.test)
-        return;
-    auto f = CreateWindowExW(kind == 902 ? 0 : WS_EX_TOOLWINDOW, L"Win32DemoFloat",
+    auto f = CreateWindowExW((kind == 902 ? 0 : WS_EX_TOOLWINDOW) | (options_.test ? WS_EX_NOACTIVATE : 0),
+                             L"Win32DemoFloat",
                              kind == 1206   ? L"Demo Active Clock"
                              : kind == 1205 ? L"Demo Sensor Status"
                                             : L"Owned demo window",
@@ -1332,7 +1459,8 @@ void App::FloatingDemo(int kind)
             WS_CHILD | WS_VISIBLE, 16, 16, S(570), S(250), f, nullptr, instance_, nullptr);
         SendMessageW(label, WM_SETFONT, reinterpret_cast<WPARAM>(font_), TRUE);
     }
-    ShowWindow(f, SW_SHOWNORMAL);
+    if (!options_.test)
+        ShowWindow(f, SW_SHOWNORMAL);
 }
 LRESULT CALLBACK App::FloatingProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
@@ -1493,47 +1621,74 @@ LRESULT CALLBACK App::PanelProc(HWND h, UINT m, WPARAM w, LPARAM l)
         return 0;
     }
 }
+void App::HandleFind(const FINDREPLACEW &request)
+{
+    if (request.Flags & FR_DIALOGTERM)
+    {
+        find_ = nullptr;
+        Event(L"Find/Replace closed.");
+        return;
+    }
+    const HWND edit = GetDlgItem(panel_, 1010);
+    if (!edit)
+    {
+        Event(L"Return to Native dialogs to search its temporary buffer.");
+        return;
+    }
+    const int length = GetWindowTextLengthW(edit);
+    std::wstring text(size_t(length) + 1, L'\0');
+    GetWindowTextW(edit, text.data(), length + 1);
+    text.resize(length);
+    const std::wstring needle = request.lpstrFindWhat ? request.lpstrFindWhat : L"";
+    const std::wstring replacement = request.lpstrReplaceWith ? request.lpstrReplaceWith : L"";
+    if (needle.empty())
+    {
+        Event(L"Enter nonempty find text.");
+        return;
+    }
+    const TextSearch::Options options{(request.Flags & FR_DOWN) != 0, (request.Flags & FR_MATCHCASE) != 0,
+                                      (request.Flags & FR_WHOLEWORD) != 0, true};
+    DWORD start = 0, end = 0;
+    SendMessageW(edit, EM_GETSEL, reinterpret_cast<WPARAM>(&start), reinterpret_cast<LPARAM>(&end));
+    if (request.Flags & FR_REPLACEALL)
+    {
+        const auto count = TextSearch::ReplaceAll(text, needle, replacement, options);
+        if (count)
+        {
+            SetWindowTextW(edit, text.c_str());
+            SendMessageW(edit, EM_SETSEL, std::min<size_t>(start, text.size()),
+                         std::min<size_t>(start, text.size()));
+        }
+        Event(L"Replace All: " + std::to_wstring(count) + L" matches in the temporary buffer.");
+        return;
+    }
+    bool replaced = false;
+    if ((request.Flags & FR_REPLACE) && end - start == needle.size() &&
+        TextSearch::MatchesAt(text, needle, start, options))
+    {
+        SendMessageW(edit, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(replacement.c_str()));
+        text.replace(start, needle.size(), replacement);
+        if (options.down)
+            start = DWORD(size_t(start) + replacement.size());
+        end = start;
+        replaced = true;
+    }
+    const auto next = TextSearch::Find(text, needle, start, end, options);
+    if (next)
+    {
+        SendMessageW(edit, EM_SETSEL, next->start, next->start + next->length);
+        SendMessageW(edit, EM_SCROLLCARET, 0, 0);
+        Event((replaced ? L"Replaced selected match; " : L"Find Next: ") +
+              std::wstring(next->wrapped ? L"wrapped to match." : L"selected match."));
+    }
+    else
+        Event(replaced ? L"Replaced selected match; no further matches." : L"Find text not found.");
+}
 LRESULT App::MainMessage(HWND h, UINT m, WPARAM w, LPARAM l)
 {
     if (m == findMessage_)
     {
-        auto data = reinterpret_cast<FINDREPLACEW *>(l);
-        if (data->Flags & FR_DIALOGTERM)
-        {
-            find_ = nullptr;
-            Event(L"Find/Replace closed.");
-        }
-        else
-        {
-            auto edit = GetDlgItem(panel_, 1010);
-            if (edit)
-            {
-                const int length = GetWindowTextLengthW(edit);
-                std::wstring text(size_t(length) + 1, L'\0');
-                GetWindowTextW(edit, text.data(), length + 1);
-                text.resize(length);
-                const std::wstring needle = data->lpstrFindWhat;
-                const auto at = text.find(needle);
-                if (at != std::wstring::npos && !needle.empty())
-                {
-                    if (data->Flags & (FR_REPLACE | FR_REPLACEALL))
-                    {
-                        size_t pos = at;
-                        do
-                        {
-                            text.replace(pos, needle.size(), data->lpstrReplaceWith);
-                            pos = text.find(needle, pos + wcslen(data->lpstrReplaceWith));
-                        } while ((data->Flags & FR_REPLACEALL) && pos != std::wstring::npos);
-                        SetWindowTextW(edit, text.c_str());
-                    }
-                    else
-                        SendMessageW(edit, EM_SETSEL, at, at + needle.size());
-                    Event(L"Find/Replace operated on the temporary demo buffer.");
-                }
-                else
-                    Event(L"Find text not found.");
-            }
-        }
+        HandleFind(*reinterpret_cast<FINDREPLACEW *>(l));
         return 0;
     }
     switch (m)
@@ -1554,7 +1709,7 @@ LRESULT App::MainMessage(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_LBUTTONDOWN:
     {
         const int x = MulDiv(GET_X_LPARAM(l), 96, dpi_);
-        if (abs(x - split_) < 10 && !options_.test)
+        if (SplitterHit(x) && !options_.test)
         {
             dragging_ = true;
             SetCapture(h);
@@ -1585,7 +1740,7 @@ LRESULT App::MainMessage(HWND h, UINT m, WPARAM w, LPARAM l)
         POINT pt{};
         GetCursorPos(&pt);
         ScreenToClient(h, &pt);
-        if (abs(MulDiv(pt.x, 96, dpi_) - split_) < 10)
+        if (SplitterHit(MulDiv(pt.x, 96, dpi_)))
         {
             SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
             return TRUE;
@@ -1594,19 +1749,16 @@ LRESULT App::MainMessage(HWND h, UINT m, WPARAM w, LPARAM l)
     }
     case WM_DPICHANGED:
     {
-        dpi_ = HIWORD(w);
-        MakeFonts();
+        RefreshPresentation(HIWORD(w));
         auto r = reinterpret_cast<RECT *>(l);
         SetWindowPos(h, nullptr, r->left, r->top, r->right - r->left, r->bottom - r->top,
                      SWP_NOZORDER | SWP_NOACTIVATE);
-        Build(page_);
         Layout();
         return 0;
     }
     case WM_SETTINGCHANGE:
     case WM_THEMECHANGED:
-        MakeFonts();
-        Build(page_);
+        RefreshPresentation(dpi_);
         return 0;
     case WM_GETMINMAXINFO:
     {
@@ -1729,10 +1881,14 @@ LRESULT App::PanelMessage(HWND h, UINT m, WPARAM w, LPARAM l)
     }
     return DefWindowProcW(h, m, w, l);
 }
+void App::ShowMain()
+{
+    ShowWindow(window_, options_.test ? SW_SHOWNOACTIVATE : SW_SHOWNORMAL);
+    UpdateWindow(window_);
+}
 int App::Run()
 {
-    ShowWindow(window_, SW_SHOWNORMAL);
-    UpdateWindow(window_);
+    ShowMain();
     MSG msg{};
     while (GetMessageW(&msg, nullptr, 0, 0) > 0)
     {
@@ -1871,8 +2027,9 @@ int App::Audit()
         check(r.left >= display_.bounds.left && r.top >= display_.bounds.top &&
                   r.right <= display_.bounds.right && r.bottom <= display_.bounds.bottom,
               "Window wholly on exact NE18NZ2 identity");
-        ShowWindow(window_, SW_SHOWNOACTIVATE);
-        UpdateWindow(window_);
+        ShowMain();
+        check(IsWindowVisible(window_) && !IsIconic(window_), "First ShowWindow displays the main gallery");
+        out << "Launcher mode=" << options_.launcher << '\n';
         check(GetForegroundWindow() == foreground, "No foreground activation");
     }
     std::vector<std::wstring> classes;
@@ -2019,6 +2176,7 @@ int App::Audit()
     check(SendMessageW(tooltip_, TTM_GETTOOLCOUNT, 0, 0) == 0,
           "Tooltip registrations cleaned during navigation");
     check(fatal_.empty(), "No callback errors");
+    RegressionAudit(out);
     check(GetForegroundWindow() == foreground, "Foreground HWND unchanged throughout audit");
     POINT end{};
     GetCursorPos(&end);

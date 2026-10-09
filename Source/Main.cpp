@@ -9,6 +9,15 @@ Display SelectDisplay(bool test)
     std::wstring wanted;
     if (test)
     {
+        auto input = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
+        if (!input)
+            throw std::runtime_error("Unlocked input desktop unavailable: visible GUI tests refused.");
+        wchar_t desktop[128]{};
+        DWORD required = 0;
+        const BOOL readable = GetUserObjectInformationW(input, UOI_NAME, desktop, sizeof(desktop), &required);
+        CloseDesktop(input);
+        if (!readable || wcscmp(desktop, L"Default") != 0)
+            throw std::runtime_error("Input desktop is locked or unavailable: visible GUI tests refused.");
         UINT paths = 0, modes = 0;
         if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &paths, &modes) != ERROR_SUCCESS)
             throw std::runtime_error("Display enumeration failed.");
@@ -76,6 +85,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
             {
                 options.test = true;
                 options.visible = true;
+            }
+            else if (std::wstring(argv[i]) == L"--launcher-test")
+            {
+                options.test = true;
+                options.visible = true;
+                options.launcher = true;
             }
             else if (std::wstring(argv[i]) == L"--report" && i + 1 < argc)
                 options.report = argv[++i];
