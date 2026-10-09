@@ -76,6 +76,23 @@ void App::SensorAudit(std::ostream &out)
               SendDlgItemMessageW(panel_, 1210, BM_GETCHECK, 0, 0) == BST_CHECKED,
           "Row mode uses native full-row selection");
     SensorSelect(list, 2, 0);
+    MSG rowEnter{};
+    rowEnter.hwnd = list;
+    rowEnter.message = WM_KEYDOWN;
+    rowEnter.wParam = VK_RETURN;
+    out << "Sensor Row native Enter dialog code="
+        << SendMessageW(list, WM_GETDLGCODE, VK_RETURN, reinterpret_cast<LPARAM>(&rowEnter)) << '\n';
+    SensorSelect(list, 0, 0);
+    const BOOL rowRouted = IsDialogMessageW(window_, &rowEnter);
+    if (!rowRouted)
+        DispatchMessageW(&rowEnter);
+    out << "Sensor Row Enter route handled=" << rowRouted << " group expanded=" << sensorExpanded_ << '\n';
+    check(!sensorExpanded_, "Row Enter reaches the group through the actual dialog routing path");
+    const BOOL rowReturnRouted = IsDialogMessageW(window_, &rowEnter);
+    if (!rowReturnRouted)
+        DispatchMessageW(&rowEnter);
+    check(sensorExpanded_, "Row Enter routes a second time and restores the group");
+    SensorSelect(list, 2, 0);
     check(Text(value).find(L"Core clock") != std::wstring::npos &&
               Text(value).find(L"3,800 MHz") != std::wstring::npos,
           "native row selection reports its dummy values");

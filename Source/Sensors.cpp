@@ -199,6 +199,8 @@ LRESULT CALLBACK App::SensorProc(HWND h, UINT m, WPARAM w, LPARAM l, UINT_PTR id
     {
         if (m == WM_NCDESTROY)
             RemoveWindowSubclass(h, SensorProc, id);
+        if (m == WM_GETDLGCODE && w == VK_RETURN)
+            return DefSubclassProc(h, m, w, l) | DLGC_WANTMESSAGE;
         if (self->sensorCellMode_)
         {
             if (m == WM_LBUTTONDOWN || m == WM_LBUTTONDBLCLK)
@@ -211,8 +213,7 @@ LRESULT CALLBACK App::SensorProc(HWND h, UINT m, WPARAM w, LPARAM l, UINT_PTR id
             if (m == WM_KEYDOWN && self->SensorKeyDown(h, UINT(w)))
                 return 0;
             if (m == WM_GETDLGCODE)
-                return DefSubclassProc(h, m, w, l) | DLGC_WANTARROWS |
-                       (w == VK_RETURN ? DLGC_WANTMESSAGE : 0);
+                return DefSubclassProc(h, m, w, l) | DLGC_WANTARROWS;
         }
     }
     catch (const std::exception &error)
