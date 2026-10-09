@@ -19,5 +19,6 @@ if ($Test) {
     $process = Start-Process -FilePath (Join-Path $output 'Win32_DemoApp.exe') -ArgumentList @('--self-test','--report',('"' + (Join-Path $output 'Audit.txt') + '"')) -WindowStyle Hidden -PassThru -Wait
     if ($process.ExitCode -ne 0) { throw "Native audit failed; see $output\Audit.txt" }
     Get-Content -LiteralPath (Join-Path $output 'Audit.txt') | Select-Object -Last 12
+    & (Join-Path $PSScriptRoot 'Tools\TestLauncher.ps1') -Report (Join-Path $output 'LauncherRegression.txt')
 }
 Write-Host "Executable: $output\Win32_DemoApp.exe"

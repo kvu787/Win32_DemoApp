@@ -2,11 +2,12 @@ param([ValidateSet('NE18NZ2')][string]$TestMonitor, [string]$Report, [string]$Te
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'TestBuilds'))
-$latest = Get-Content -LiteralPath (Join-Path $root 'LatestReady.json') -Raw | ConvertFrom-Json
-$directory = [IO.Path]::GetFullPath((Join-Path $root $latest.Directory))
 if ($TestBuildDirectory) {
     if (!$TestMonitor) { throw 'A test build override requires the explicit NE18NZ2 launcher-test mode.' }
     $directory = [IO.Path]::GetFullPath($TestBuildDirectory)
+} else {
+    $latest = Get-Content -LiteralPath (Join-Path $root 'LatestReady.json') -Raw | ConvertFrom-Json
+    $directory = [IO.Path]::GetFullPath((Join-Path $root $latest.Directory))
 }
 if (!$directory.StartsWith($root + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid ready-build path.' }
 $executable = Join-Path $directory 'Win32_DemoApp.exe'

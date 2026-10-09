@@ -22,6 +22,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Tools\SnapshotRun.cmd') -Destination (Join-Path $snapshot 'Run.cmd')
     $reports = Join-Path $snapshot 'Verification'
     New-Item -ItemType Directory -Path $reports | Out-Null
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'BuildOutput\Release\LauncherRegression.txt') -Destination $reports
     $report = Join-Path $reports 'IndependentLaunch.txt'
     $process = Start-Process -FilePath (Join-Path $snapshot 'Win32_DemoApp.exe') -ArgumentList @('--self-test','--report',('"' + $report + '"')) -WorkingDirectory ([IO.Path]::GetTempPath()) -WindowStyle Hidden -PassThru -Wait
     if ($process.ExitCode -ne 0) { throw "Copied executable verification failed; this directory is not ready: $snapshot" }
