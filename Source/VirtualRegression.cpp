@@ -208,7 +208,14 @@ void App::VirtualAudit(std::ostream &out)
               GetGuiResources(GetCurrentProcess(), GR_USEROBJECTS) <= user + 2,
           "16 repeated topic visits preserve the model and bounded GDI/USER/window resources");
     if (options_.visible)
+    {
         Capture(options_.report.parent_path() / L"VirtualOwnerData.bmp");
+        scrollY_ = 250;
+        LayoutChildren();
+        Capture(options_.report.parent_path() / L"VirtualOwnerDataDetails.bmp");
+        scrollY_ = 0;
+        LayoutChildren();
+    }
     check(GetFocus() == focus && fatal_.empty(),
           "callback tests do not change thread focus or report errors");
     virtualOrder_ = savedOrder;

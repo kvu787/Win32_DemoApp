@@ -2055,6 +2055,18 @@ void App::Capture(const std::filesystem::path &path)
     if (r.left < display_.bounds.left || r.top < display_.bounds.top || r.right > display_.bounds.right ||
         r.bottom > display_.bounds.bottom)
         throw std::runtime_error("Test window escaped NE18NZ2 bounds; capture refused.");
+    // Test-only capture: allow native theme transitions to finish before printing.
+    Sleep(350);
+    Pump();
+    EnumChildWindows(
+        window_,
+        [](HWND child, LPARAM) -> BOOL
+        {
+            BufferedPaintStopAllAnimations(child);
+            return TRUE;
+        },
+        0);
+    RedrawWindow(window_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
     auto dc = GetDC(window_);
     auto memory = CreateCompatibleDC(dc);
     auto bitmap = CreateCompatibleBitmap(dc, r.right - r.left, r.bottom - r.top);

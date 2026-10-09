@@ -233,7 +233,9 @@ void App::SensorAudit(std::ostream &out)
     SendMessageW(panel_, WM_COMMAND, MAKEWPARAM(1210, BN_CLICKED),
                  reinterpret_cast<LPARAM>(GetDlgItem(panel_, 1210)));
     check(!sensorCellMode_ && (ListView_GetExtendedListViewStyle(list) & LVS_EX_FULLROWSELECT) &&
-              ListView_GetSelectedCount(list) == 1 && ListView_GetNextItem(list, -1, LVNI_SELECTED) == 4,
+              ListView_GetSelectedCount(list) == 1 && ListView_GetNextItem(list, -1, LVNI_SELECTED) == 4 &&
+              SendDlgItemMessageW(panel_, 1210, BM_GETCHECK, 0, 0) == BST_CHECKED &&
+              SendDlgItemMessageW(panel_, 1211, BM_GETCHECK, 0, 0) == BST_UNCHECKED,
           "switching back restores native row selection of the same stable sensor");
     if (options_.visible)
         Capture(options_.report.parent_path() / L"SensorsRowSelection.bmp");
